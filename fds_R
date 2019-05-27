@@ -1,0 +1,160 @@
+setwd("D:\\sapienza\\bressan project")
+house=read.csv("train.csv",stringsAsFactors = F)
+library(tidyverse)
+library(corrplot)
+# more categories 
+for (i in c("Alley", "Fence", "PoolQC","FireplaceQu", "MiscFeature","BsmtQual","BsmtCond","BsmtExposure",
+            "BsmtFinType2","GarageType","GarageFinish","GarageQual","GarageCond","MasVnrType", "BsmtFinType1")){
+  house[,i]<-house[,i] %>%  replace_na("None")
+}
+
+str(house)
+length(which(house$GarageYrBlt == "None"))
+summary(lm(SalePrice~ MSZoning, data = house ))
+house[which(house$GarageYrBlt == "None"),] %>% dplyr::select(YearBuilt, YearRemodAdd,GarageYrBlt)
+
+?select
+
+# data tidyng
+house1<- house[!rowSums(is.na(house)) > ncol(house)*.9,]
+
+
+boxplot(house$GarageYrBlt)
+
+str(house)
+yy$ga
+facts <- house[,sapply(house,is.character)]
+
+yy <- data.frame(lapply(facts, as.factor))
+
+
+noume <- house[,sapply(house,is.numeric)]
+
+# correlations ------------------------------------------------------------
+
+
+
+cor_numVar <- cor(noume, use="pairwise.complete.obs") #correlations of all numeric variables
+
+#sort on decreasing correlations with SalePrice
+cor_sorted <- as.matrix(sort(cor_numVar[,'SalePrice'], decreasing = TRUE))
+#select only high corelations
+CorHigh <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.1)))
+cor_numVar <- cor_numVar[CorHigh, CorHigh]
+
+corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
+
+
+
+# removing lotfrontage -----------------------------------------------------
+#after seeing the correlTIONS LOT FRONTAGE DOESN T HAve enough particular correlations with the other variables
+
+
+noume$LotFrontage <- NULL
+summary(house)
+colnames(house)
+# removing outliers ------------------------------------------
+
+house[is.na(house[,27]), 27] <- mean(house[,27], na.rm = TRUE)
+house[is.na(house[,27]), 27]
+
+colnames(noume) 
+
+n <- length(noume)
+upper<-vector(mode='integer',length = n)
+lower<-vector(mode='integer',length = n)
+
+for (i in  2:n){
+  upper[i]<- mean(noume[,i],na.rm = TRUE)+ 3 *sd(noume[,i],na.rm = TRUE)
+  lower[i] <-  mean(noume[,i],na.rm = TRUE) - 3 *sd(noume[,i],na.rm = TRUE) 
+}
+
+
+
+a <-  subset(noume, noume[,n] >lower[n]  & noume[,n] < upper[n] )
+for (i in 2:(n-1)){
+  a<- subset(a, a[,i] >lower[i]  & a[,i] < upper[i] )
+}
+
+
+# normalization -----------------------------------------------------------
+
+
+
+temp <- a[,1]
+aNormZ <- as.data.frame(scale(a))
+aNormZ[,1] <- temp
+aNormZ$KitchenAbvGr <- NULL
+aNormZ$PoolArea <- NULL
+aNormZ$BsmtHalfBath <- NULL
+
+# lm ----------------------------------------------------------------------
+
+
+alias(lm(SalePrice ~.,data=a))
+
+
+# yy operations and cleaning ----------------------------------------------
+
+
+
+##### drop the column street, utilities,condition2,roofmatl,misc_feature,poolQC,Functional
+
+yy$Street<-NULL
+yy$Utilities<-NULL
+yy$Condition2<-NULL
+yy$RoofMatl<-NULL
+yy$MiscFeature<-NULL
+yy$PoolQC<-NULL
+yy$Functional<-NULL
+yy[1380, 26] <- "SBrkr"
+
+
+which(is.na(yy$Electrical))
+colnames(yy)
+#index Electrical is 26, we exchange the unique NA value with the common value 
+
+
+
+
+
+# work --------------------------------------------------------------------
+
+
+plot(yy$Condition2)
+
+yy$Id <- house[,1]
+length(yy$Id)
+#yy$id <- house$Id
+total <- merge(yy, aNormZ, by = "Id")
+summary(total)
+
+#total$PoolArea<- NULL
+#total$KitchenAbvGr<- NULL
+#total$BsmtHalfBath<- NULL
+
+total$SaleType<- as.factor(total$SaleType)
+summary(lm(SalePrice~., data = total))
+
+summary(lm(SalePrice~Condition1+YrSold, data = total))
+
+
+str(total)
+
+cor_numVar <- cor(aNormZ, use="pairwise.complete.obs") #correlations of all numeric variables
+
+#sort on decreasing correlations with SalePrice
+cor_sorted <- as.matrix(sort(cor_numVar[,'SalePrice'], decreasing = TRUE))
+#select only high corelations
+CorHigh <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.3)))
+cor_numVar <- cor_numVar[CorHigh, CorHigh]
+
+corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
+
+
+
+#heating most GasA
+summary(yy)
+plot(yy$Electrical)
+unique(yy$MiscFeature)
+plot(yy$GarageFinish)
