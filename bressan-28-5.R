@@ -1,33 +1,30 @@
 setwd("C:\\Users\\Alessandra\\Documents\\DataScience\\1year\\fds-project")
-
-houseTrain=read.csv("train.csv",stringsAsFactors = F)
-houseTest= read.csv("test.csv",stringsAsFactors = F)
-houseTest$SalePrice<- NA
-
-house<-rbind(houseTrain,houseTest)
-#length(house[1:200,1])
 library(tidyverse)
 library(corrplot)
+
+houseTrain=read.csv("train.csv")
+houseTest= read.csv("test.csv")
+houseTest$SalePrice<- NA
+house<-rbind(houseTrain,houseTest)
+
 # more categories 
-for (i in c("Alley", "Fence", "PoolQC","FireplaceQu", "MiscFeature","BsmtQual","BsmtCond","BsmtExposure",
-            "BsmtFinType2","GarageType","GarageFinish","GarageQual","GarageCond","MasVnrType", "BsmtFinType1")){
-  house[,i]<-house[,i] %>%  replace_na("None")
-}
-
-str(house)
-length(which(house$GarageYrBlt == "None"))
-summary(lm(SalePrice~ MSZoning, data = house ))
-house[which(house$GarageYrBlt == "None"),] %>% dplyr::select(YearBuilt, YearRemodAdd,GarageYrBlt)
-
-?select
-
-# data tidyng
-house1<- house[!rowSums(is.na(house)) > ncol(house)*.9,]
+#for (i in c("Alley", "Fence", "PoolQC","FireplaceQu", "MiscFeature","BsmtQual","BsmtCond","BsmtExposure",
+#            "BsmtFinType2","GarageType","GarageFinish","GarageQual","GarageCond","MasVnrType", "BsmtFinType1")){
+#  house[,i]<-house[,i] %>%  replace_na("None")
+#}
 
 
-boxplot(house$GarageYrBlt)
+#length(which(house$GarageYrBlt == "None"))
+#summary(lm(SalePrice~ MSZoning, data = house ))
+#house[which(house$GarageYrBlt == "None"),] %>% dplyr::select(YearBuilt, YearRemodAdd,GarageYrBlt)
 
-str(house)
+# data tidyng and re-assigning
+SalePrices <- house[,81] 
+house <- house[!rowSums(is.na(house)) > ncol(house)*.9,]
+house <- house[,!colSums(is.na(house)) > ncol(house)*.9]
+house$SalePrice <- SalePrices
+houseTrain <- house[1:1460,]   #1460 rows!!!
+houseTest <- house[1461:2919,] #1459 rows!!!
 
 facts <- house[,sapply(house,is.character)]
 yy <- data.frame(lapply(facts, as.factor))
@@ -49,18 +46,16 @@ corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
 
 # removing lotfrontage -----------------------------------------------------
 #after seeing the correlTIONS LOT FRONTAGE DOESN T HAve enough particular correlations with the other variables
-
-
 noume$LotFrontage <- NULL
-#summary(house)
-#colnames(house)
 
-# removing outliers ------------------------------------------
+
+# removing outliers (do it only for train set) ------------------------------------------
 #house[,27] è MasVnrArea
 house[is.na(house[,27]), 27] <- mean(house[,27], na.rm = TRUE)
 house[is.na(house[,27]), 27]
-
+colnames(house)
 colnames(noume) 
+
 
 n <- length(noume)
 upper<-vector(mode='integer',length = n)
@@ -83,7 +78,8 @@ for (i in 2:(n-2)){ # the -1 is now -2
   a<- subset(a, a[,i] >lower[i]  & a[,i] < upper[i] )
 }
 
-###it's necessary to take from noume the saleprice column and put it in a
+###it's necessary to take from noume the saleprice column and put it in a, 
+###SalePrice doesn't have to be normalized
 
 # normalization -----------------------------------------------------------
 tempId <- a[,1]
@@ -124,7 +120,7 @@ yy[1380, 26] <- "SBrkr"
 yy$Id <- house[,1]
 #length(yy$Id)
 total <- merge(yy, aNormZ, by = "Id")
-total[509,38]
+
 
 #total$PoolArea<- NULL
 #total$KitchenAbvGr<- NULL
@@ -134,7 +130,7 @@ total[509,38]
 total$SaleType<- as.factor(total$SaleType)
 
 TrainSet <- total[1:1460,]
-TestSet <- total[1461:2919,]
+TestSet <- total[1461:1966,]
 TestSet$SalePrice <- NULL 
 
 #summary(lm(SalePrice~., data = total))
@@ -159,32 +155,41 @@ corrplot.mixed(cor_numVar, tl.col="black", tl.pos = "lt")
 lr <- lm(SalePrice ~ OverallQual+GrLivArea+GarageCars+FullBath+YearBuilt+TotalBsmtSF+YearRemodAdd+OverallCond+
            MSZoning+LotConfig+Neighborhood+ExterQual+BsmtQual+KitchenQual, data = TrainSet)
 summary(lr)
+colnames(houseTrain)
+
+prova <- lm(SalePrice ~ OverallQual+GrLivArea+GarageCars+YearBuilt+TotalBsmtSF+OverallCond+
+              MSZoning+LotConfig+Neighborhood+ExterQual+KitchenQual, data = houseTrain) 
 
 lr2 <- lm(SalePrice ~ OverallQual+GrLivArea+GarageCars+YearBuilt+TotalBsmtSF+OverallCond+
-            MSZoning+LotConfig+Neighborhood+ExterQual+BsmtQual+KitchenQual, data = TrainSet)
-summary(lr2)
+            MSZoning+LotConfig+Neighborhood+ExterQual+KitchenQual, na.action = na.exclude,data = houseTrain)
 
-#heating most GasA
+
+# heasing most GasA -------------------------------------------------------
 summary(yy)
 plot(yy$Electrical)
 unique(yy$MiscFeature)
 plot(yy$GarageFinish)
 
 # prediction on Test --------------------------------------------------------------
+prediction <- function(model, test){
+  prediction <- predict(model, test)
+  check <- cbind(prediction, as.integer(test$Id))
+  colnames(check) <- c('SalePrice', 'Id')
+  final <- check[,c(2,1)]
+  return(check)
+}
+the_csv <- prediction(lr2, houseTest)
+write.csv(the_csv, file = "submit_bressan_prova.csv",row.names=FALSE)
+the_csv[96,]
+colnames(houseTest)
 
-#houseTest= read.csv("test.csv")
-predictTest= predict(lr2, TestSet)
+# check of NA's -----------------------------------------------------------
+which(is.na(the_csv[,1]))
+
 
 #output <- cbind(houseTest, predictTest)
 #NA_test_indices <- which(is.na(output$predictTest))
 #houseTest <- houseTest[(!NA_test_indices),]
-
-check=cbind(predictTest, as.integer(TestSet$Id))
-#check[700,]
-colnames(check)=c('SalePrice', 'Id')
-final=check[,c(2,1)]
-write.csv(check, file = "submit_bressan.csv",row.names=FALSE)
-
 
 
 #-----------------------
